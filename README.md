@@ -1,6 +1,6 @@
 # RealFit - AI-Powered Social Fitness App
 
-RealFit is a BeReal-style social fitness app that provides AI-powered form analysis through daily random workout prompts. The app uses advanced computer vision (MediaPipe Pose) to analyze workout videos and provide real-time feedback.
+RealFit is a BeReal-style social fitness app that provides AI-powered form analysis through daily random workout prompts. The app uses advanced computer vision (MediaPipe Pose: Google machine learning solution that provides real-time, high-fidelity tracking of human body poses from RGB cameras) to analyze workout videos and provide real-time feedback.
 
 ## 🎯 Features
 
