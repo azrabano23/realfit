@@ -1,7 +1,7 @@
 """Rep counting logic using joint angle trajectories"""
 import numpy as np
 from typing import List, Dict, Optional, Tuple
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, savgol_filter
 from ml.pose_extractor import PoseExtractor
 
 
@@ -61,16 +61,26 @@ class RepCounter:
         if len(angle_series) < 10:
             return 0, []
         
+        # Apply Savitzky-Golay filter for better smoothing
+        window_length = min(11, len(angle_series) if len(angle_series) % 2 == 1 else len(angle_series) - 1)
+        if window_length >= 5:
+            angle_series = savgol_filter(angle_series, window_length, 3)
+        
         # Find peaks (bottom of squat = maximum knee angle)
         # Invert signal to find peaks (we want to find when knee is most bent)
         inverted = np.max(angle_series) - angle_series
+        
+        # Dynamic prominence threshold based on signal characteristics
+        angle_range = np.max(angle_series) - np.min(angle_series)
+        prominence_threshold = max(angle_range * 0.3, np.std(angle_series) * 0.6)
         
         # Find peaks with minimum distance (at least 1 second between reps)
         min_distance = int(fps * 1.0)
         peaks, properties = find_peaks(
             inverted,
             distance=min_distance,
-            prominence=np.std(angle_series) * 0.5
+            prominence=prominence_threshold,
+            height=np.percentile(inverted, 30)  # Must be at least 30th percentile
         )
         
         rep_count = len(peaks)
@@ -111,11 +121,20 @@ class RepCounter:
         if len(angle_series) < 10:
             return 0, []
         
+        # Apply Savitzky-Golay filter
+        window_length = min(11, len(angle_series) if len(angle_series) % 2 == 1 else len(angle_series) - 1)
+        if window_length >= 5:
+            angle_series = savgol_filter(angle_series, window_length, 3)
+        
         # Deadlift: find when hips are lowest (highest angle)
+        angle_range = np.max(angle_series) - np.min(angle_series)
+        prominence_threshold = max(angle_range * 0.3, np.std(angle_series) * 0.6)
+        
         peaks, _ = find_peaks(
             angle_series,
             distance=int(fps * 1.0),
-            prominence=np.std(angle_series) * 0.5
+            prominence=prominence_threshold,
+            height=np.percentile(angle_series, 40)
         )
         
         rep_count = len(peaks)
@@ -156,12 +175,21 @@ class RepCounter:
         if len(angle_series) < 10:
             return 0, []
         
+        # Apply Savitzky-Golay filter
+        window_length = min(11, len(angle_series) if len(angle_series) % 2 == 1 else len(angle_series) - 1)
+        if window_length >= 5:
+            angle_series = savgol_filter(angle_series, window_length, 3)
+        
         # Bench: find when elbows are most bent (bottom of rep)
         inverted = np.max(angle_series) - angle_series
+        angle_range = np.max(angle_series) - np.min(angle_series)
+        prominence_threshold = max(angle_range * 0.3, np.std(angle_series) * 0.6)
+        
         peaks, _ = find_peaks(
             inverted,
             distance=int(fps * 1.0),
-            prominence=np.std(angle_series) * 0.5
+            prominence=prominence_threshold,
+            height=np.percentile(inverted, 30)
         )
         
         rep_count = len(peaks)

@@ -13,14 +13,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 class PoseExtractor:
     """Extract pose landmarks from video frames using MediaPipe"""
     
-    def __init__(self):
+    def __init__(self, model_complexity: int = 1):
+        """Initialize pose extractor with MediaPipe Pose
+        
+        Args:
+            model_complexity: 0 (lite), 1 (full), or 2 (heavy) - higher is more accurate but slower
+        """
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=1,  # 0, 1, or 2 (higher = more accurate, slower)
+            model_complexity=model_complexity,
             enable_segmentation=False,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            smooth_landmarks=True,  # Enable built-in smoothing
+            min_detection_confidence=0.7,  # Increased for better quality
+            min_tracking_confidence=0.7    # Increased for better quality
         )
         self.mp_drawing = mp.solutions.drawing_utils
     
@@ -69,11 +75,16 @@ class PoseExtractor:
     def smooth_landmarks(
         self,
         landmarks_list: List[Optional[Dict]],
-        alpha: float = 0.7
+        alpha: float = 0.7,
+        min_visibility: float = 0.5
     ) -> List[Optional[Dict]]:
         """
         Apply exponential moving average smoothing to landmarks.
-        alpha: smoothing factor (0-1), higher = less smoothing
+        
+        Args:
+            landmarks_list: List of landmark dictionaries per frame
+            alpha: smoothing factor (0-1), higher = less smoothing
+            min_visibility: minimum visibility threshold to use landmark
         """
         if not landmarks_list:
             return []
@@ -94,7 +105,17 @@ class PoseExtractor:
             # Smooth each landmark
             smoothed_frame = {}
             for idx in landmarks.keys():
-                if idx in prev_landmarks:
+                # Only use landmarks with sufficient visibility
+                if landmarks[idx]['visibility'] < min_visibility:
+                    if idx in prev_landmarks:
+                        # Use previous value if current is low confidence
+                        smoothed_frame[idx] = prev_landmarks[idx]
+                    else:
+                        smoothed_frame[idx] = landmarks[idx]
+                    continue
+                
+                if idx in prev_landmarks and prev_landmarks[idx]['visibility'] >= min_visibility:
+                    # Apply exponential smoothing
                     smoothed_frame[idx] = {
                         'x': alpha * landmarks[idx]['x'] + (1 - alpha) * prev_landmarks[idx]['x'],
                         'y': alpha * landmarks[idx]['y'] + (1 - alpha) * prev_landmarks[idx]['y'],
